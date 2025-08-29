@@ -4,7 +4,7 @@ const path = require('path');
 module.exports = {
   config: {
     name: "setbal",
-    version: "1.2",
+    version: "1.3",
     author: "𝕴𝖗𝖋𝖆𝖓",
     countDown: 5,
     role: 2, // Only bot admin can use
@@ -16,39 +16,39 @@ module.exports = {
   },
 
   onStart: async function ({ message, event, args, usersData, api }) {
-    // Get bot owner ID from config
-    const botOwnerIDs = global.GoatBot.config.adminBot || [];
-    
-    // Check if user is bot owner
-    if (!botOwnerIDs.includes(event.senderID)) {
-      return message.reply("❌ This command is only for the bot owner.");
-    }
-
-    // Check if arguments are provided
-    if (args.length < 2) {
-      return message.reply("⚠️ Please provide a user and amount. Usage: /setbal [@mention | uid] [amount]");
-    }
-
-    let targetID;
-    let amount = parseFloat(args[args.length - 1]);
-
-    // Check if amount is valid
-    if (isNaN(amount) || amount < 0) {
-      return message.reply("⚠️ Please provide a valid amount.");
-    }
-
-    // Check if first argument is a mention
-    if (Object.keys(event.mentions).length > 0) {
-      targetID = Object.keys(event.mentions)[0];
-    } else {
-      // Check if first argument is a UID
-      targetID = args[0];
-      if (isNaN(targetID)) {
-        return message.reply("⚠️ Please provide a valid user mention or UID.");
-      }
-    }
-
     try {
+      // Get bot owner ID from config
+      const botOwnerIDs = global.GoatBot.config.adminBot || [];
+      
+      // Check if user is bot owner
+      if (!botOwnerIDs.includes(event.senderID.toString())) {
+        return message.reply("❌ This command is only for the bot owner.");
+      }
+
+      // Check if arguments are provided
+      if (args.length < 2) {
+        return message.reply("⚠️ Please provide a user and amount. Usage: /setbal [@mention | uid] [amount]");
+      }
+
+      let targetID;
+      let amount = parseFloat(args[args.length - 1]);
+
+      // Check if amount is valid
+      if (isNaN(amount) || amount < 0) {
+        return message.reply("⚠️ Please provide a valid amount.");
+      }
+
+      // Check if first argument is a mention
+      if (Object.keys(event.mentions).length > 0) {
+        targetID = Object.keys(event.mentions)[0];
+      } else {
+        // Check if first argument is a UID
+        targetID = args[0];
+        if (isNaN(targetID)) {
+          return message.reply("⚠️ Please provide a valid user mention or UID.");
+        }
+      }
+
       // Get user data
       const userData = await usersData.get(targetID);
       const userInfo = await api.getUserInfo(targetID);
