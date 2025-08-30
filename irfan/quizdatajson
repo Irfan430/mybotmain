@@ -1,0 +1,128 @@
+[
+  {
+    "question": "বাংলাদেশের স্বাধীনতার বছর?",
+    "options": ["১৯৪৭", "১৯৭১", "১৯৫২", "১৯৭৫"],
+    "answer": "b"
+  },
+  {
+    "question": "বাংলাদেশের জাতীয় ফল?",
+    "options": ["আম", "কাঁঠাল", "লিচু", "পেয়ারা"],
+    "answer": "b"
+  },
+  {
+    "question": "বাংলাদেশের জাতীয় পাখি?",
+    "options": ["দোয়েল", "শালিক", "কাক", "চড়ুই"],
+    "answer": "a"
+  },
+  {
+    "question": "বিশ্বের দীর্ঘতম নদী কোনটি?",
+    "options": ["Amazon", "Nile", "Yangtze", "Mississippi"],
+    "answer": "b"
+  },
+  {
+    "question": "সূর্যের সবচেয়ে নিকটতম গ্রহ?",
+    "options": ["Venus", "Earth", "Mercury", "Mars"],
+    "answer": "c"
+  },
+  {
+    "question": "What is the capital of Canada?",
+    "options": ["Toronto", "Vancouver", "Ottawa", "Montreal"],
+    "answer": "c"
+  },
+  {
+    "question": "Capital of Australia?",
+    "options": ["Sydney", "Melbourne", "Canberra", "Perth"],
+    "answer": "c"
+  },
+  {
+    "question": "Capital of Japan?",
+    "options": ["Kyoto", "Tokyo", "Osaka", "Hiroshima"],
+    "answer": "b"
+  },
+  {
+    "question": "Capital of China?",
+    "options": ["Shanghai", "Beijing", "Guangzhou", "Hong Kong"],
+    "answer": "b"
+  },
+  {
+    "question": "HTTP এর পূর্ণরূপ?",
+    "options": ["HyperText Transfer Protocol", "HighText Transfer Protocol", "Hyper Transfer Text Process", "High Transfer Text Protocol"],
+    "answer": "a"
+  },
+  {
+    "question": "USB এর পূর্ণরূপ?",
+    "options": ["Universal Serial Bus", "Universal Standard Bus", "United Serial Bus", "Unique Serial Bus"],
+    "answer": "a"
+  },
+  {
+    "question": "এক কিলোবাইটে কত বাইট?",
+    "options": ["1000", "1024", "512", "2048"],
+    "answer": "b"
+  },
+  {
+    "question": "জলের রাসায়নিক সংকেত?",
+    "options": ["CO2", "H2O", "O2", "NaCl"],
+    "answer": "b"
+  },
+  {
+    "question": "অক্সিজেনের পারমাণবিক সংখ্যা?",
+    "options": ["6", "7", "8", "9"],
+    "answer": "c"
+  },
+  {
+    "question": "২ + ২ = ?",
+    "options": ["3", "4", "5", "6"],
+    "answer": "b"
+  },
+  {
+    "question": "৫ × ৯ = ?",
+    "options": ["35", "40", "45", "50"],
+    "answer": "c"
+  },
+  {
+    "question": "Who is the founder of Microsoft?",
+    "options": ["Steve Jobs", "Bill Gates", "Mark Zuckerberg", "Larry Page"],
+    "answer": "b"
+  },
+  {
+    "question": "Who is the founder of Facebook?",
+    "options": ["Bill Gates", "Steve Jobs", "Mark Zuckerberg", "Elon Musk"],
+    "answer": "c"
+  },
+  {
+    "question": "Who is the founder of Google?",
+    "options": ["Larry Page & Sergey Brin", "Bill Gates", "Jeff Bezos", "Steve Jobs"],
+    "answer": "a"
+  },
+  {
+    "question": "বাংলা বর্ণমালায় স্বরবর্ণ কয়টি?",
+    "options": ["10", "11", "12", "13"],
+    "answer": "b"
+  },
+  {
+    "question": "বাংলা বর্ণমালায় ব্যঞ্জনবর্ণ কয়টি?",
+    "options": ["31", "32", "39", "40"],
+    "answer": "c"
+  },
+  {
+    "question": "বিশ্বের বৃহত্তম মহাসাগর?",
+    "options": ["Indian Ocean", "Atlantic Ocean", "Pacific Ocean", "Arctic Ocean"],
+    "answer": "c"
+  },
+  {
+    "question": "বিশ্বের দীর্ঘতম সমুদ্রসৈকত কোথায়?",
+    "options": ["Miami", "Cox's Bazar", "Bondi Beach", "Copacabana"],
+    "answer": "b"
+  },
+  {
+    "question": "মানবদেহে হাড়ের সংখ্যা কত?",
+    "options": ["202", "204", "206", "208"],
+    "answer": "c"
+  },
+  {
+    "question": "জাতিসংঘের সদর দফতর কোথায়?",
+    "options": ["Geneva", "New York", "Paris", "London"],
+    "answer": "b"
+  }
+  // --- এখান থেকে একই স্ট্রাকচারে আরও প্রশ্ন যোগ করতে থাকবে ---
+]
