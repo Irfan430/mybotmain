@@ -1,117 +1,100 @@
-const axios = require("axios");
-
-const baseApiUrl = async () => {
- const base = await axios.get(
- `https://raw.githubusercontent.com/Blankid018/D1PT0/main/baseApiUrl.json`
- );
- return base.data.api;
-};
+const fs = require("fs");
+const path = require("path");
 
 module.exports = {
- config: {
- name: "quiz",
- aliases: ["qz"],
- version: "1.0",
- author: "Dipto",
- countDown: 0,
- role: 0,
- category: "game",
- guide: "{p}quiz2 \n{pn}quiz2 bn \n{p}quiz2 en",
- },
+  config: {
+    name: "quiz",
+    aliases: ["qz"],
+    version: "3.0",
+    author: "Irfan",
+    countDown: 3,
+    role: 0,
+    description: "Multiple choice quiz game with betting",
+    category: "game",
+    guide: {
+      en: "{p}qz <bet>"
+    }
+  },
 
- onStart: async function ({ api, event, usersData, args }) {
- const input = args.join('').toLowerCase() || "bn";
- let timeout = 300;
- let category = "bangla";
- if (input === "bn" || input === "bangla") {
- category = "bangla";
- } else if (input === "en" || input === "english") {
- category = "english";
- }
+  onStart: async function ({ message, event, args, usersData }) {
+    const bet = Math.max(0, parseInt(args[0], 10) || 0);
 
- try {
- const response = await axios.get(
- `${await baseApiUrl()}/quiz?category=${category}&q=random`,
- );
+    // Load quiz data
+    const quizPath = path.join(process.cwd(), "irfan", "quizdata.json");
+    let data;
+    try {
+      const raw = fs.readFileSync(quizPath, "utf-8");
+      data = JSON.parse(raw);
+    } catch (e) {
+      return message.reply("❌ quizdata.json লোড করা যায়নি!");
+    }
 
- const quizData = response.data.question;
- const { question, correctAnswer, options } = quizData;
- const { a, b, c, d } = options;
- const namePlayerReact = await usersData.getName(event.senderID);
- const quizMsg = {
- body: `\n╭──✦ ${question}\n├‣ 𝗔) ${a}\n├‣ 𝗕) ${b}\n├‣ 𝗖) ${c}\n├‣ 𝗗) ${d}\n╰──────────────────‣\n𝚁𝚎𝚙𝚕𝚢 𝚝𝚘 𝚝𝚑𝚒𝚜 𝚖𝚎𝚜𝚜𝚊𝚐𝚎 𝚠𝚒𝚝𝚑 𝚢𝚘𝚞𝚛 𝚊𝚗𝚜𝚠𝚎𝚛.`,
- };
+    if (!Array.isArray(data) || data.length === 0) {
+      return message.reply("❌ কোনো প্রশ্ন পাওয়া যায়নি!");
+    }
 
- api.sendMessage(
- quizMsg,
- event.threadID,
- (error, info) => {
- global.GoatBot.onReply.set(info.messageID, {
- type: "reply",
- commandName: this.config.name,
- author: event.senderID,
- messageID: info.messageID,
- dataGame: quizData,
- correctAnswer,
- nameUser: namePlayerReact,
- attempts: 0
- });
- setTimeout(() => {
- api.unsendMessage(info.messageID);
- }, timeout * 1000);
- },
- event.messageID,
- );
- } catch (error) {
- console.error("❌ | Error occurred:", error);
- api.sendMessage(error.message, event.threadID, event.messageID);
- }
- },
+    // Pick random question
+    const q = data[Math.floor(Math.random() * data.length)];
+    const options = ["𝗔", "𝗕", "𝗖", "𝗗"];
+    let formatted = `╭──✦ ${q.question}\n`;
+    q.options.forEach((opt, i) => {
+      formatted += `├‣ ${options[i]}) ${opt}\n`;
+    });
+    formatted += "╰──────────────────‣\n";
+    formatted += "𝚁𝚎𝚙𝚕𝚢 𝚝𝚘 𝚝𝚑𝚒𝚜 𝚖𝚎𝚜𝚜𝚊𝚐𝚎 𝚠𝚒𝚝𝚑 𝚢𝚘𝚞𝚛 𝚊𝚗𝚜𝚠𝚎𝚛.";
 
- onReply: async ({ event, api, Reply, usersData }) => {
-const { correctAnswer, nameUser, author } = Reply;
- if (event.senderID !== author)
- return api.sendMessage(
- "Who are you bby🐸🦎",
- event.threadID,
- event.messageID
- );
- const maxAttempts = 2;
+    // Ensure user has enough balance
+    if (bet > 0) {
+      try {
+        const u = await usersData.get(event.senderID);
+        if ((u.money || 0) < bet) {
+          return message.reply(`❌ পর্যাপ্ত ব্যালেন্স নেই। আপনার ব্যালেন্স: $${u.money || 0}`);
+        }
+      } catch (e) {}
+    }
 
- switch (Reply.type) {
- case "reply": {
- let userReply = event.body.toLowerCase();
- if (Reply.attempts >= maxAttempts) {
- await api.unsendMessage(Reply.messageID);
- const incorrectMsg = `🚫 | ${nameUser}, you have reached the maximum number of attempts (2).\nThe correct answer is: ${correctAnswer}`;
- return api.sendMessage(incorrectMsg, event.threadID, event.messageID);
- }
- if (userReply === correctAnswer.toLowerCase()) {
- api.unsendMessage(Reply.messageID)
- .catch(console.error);
- let rewardCoins = 300;
- let rewardExp = 100;
- let userData = await usersData.get(author);
- await usersData.set(author, {
- money: userData.money + rewardCoins,
- exp: userData.exp + rewardExp,
- data: userData.data,
- });
- let correctMsg = `Congratulations, ${nameUser}! 🌟🎉\n\nYou're a Quiz Champion! 🏆\n\nYou've earned ${rewardCoins} Coins 💰 and ${rewardExp} EXP 🌟\n\nKeep up the great work! 🚀`;
- api.sendMessage(correctMsg, event.threadID, event.messageID);
- } else {
- Reply.attempts += 1;
-global.GoatBot.onReply.set(Reply.messageID, Reply);
- api.sendMessage(
- `❌ | Wrong Answer. You have ${maxAttempts - Reply.attempts} attempts left.\n✅ | Try Again!`,
- event.threadID,
- event.messageID,
- );
- }
- break;
- }
- default:
- break;
- }
- },
+    return message.reply(formatted, (err, info) => {
+      if (err) return;
+      const Reply = {
+        commandName: "quiz",
+        messageID: info.messageID,
+        threadID: event.threadID,
+        author: event.senderID,
+        correct: String(q.answer).trim().toLowerCase(),
+        bet
+      };
+      global.GoatBot.onReply.set(info.messageID, Reply);
+    });
+  },
+
+  onReply: async function ({ message, event, Reply, usersData }) {
+    if (!Reply || Reply.commandName !== "quiz") return;
+    if (event.senderID !== Reply.author) return;
+
+    const ans = (event.body || "").trim().toLowerCase();
+    const correct = Reply.correct;
+    const bet = Reply.bet || 0;
+
+    if (ans === correct) {
+      if (bet > 0) {
+        const u = await usersData.get(event.senderID);
+        u.money = (u.money || 0) + bet;
+        u.data = u.data || {};
+        u.data.quizWin = (u.data.quizWin || 0) + 1;
+        await usersData.set(event.senderID, u);
+      }
+      global.GoatBot.onReply.delete(Reply.messageID);
+      return message.reply(`✅ সঠিক উত্তর!\n💰 জিতলেন: $${bet}`);
+    } else {
+      if (bet > 0) {
+        const u = await usersData.get(event.senderID);
+        u.money = Math.max(0, (u.money || 0) - bet);
+        u.data = u.data || {};
+        u.data.quizLoss = (u.data.quizLoss || 0) + 1;
+        await usersData.set(event.senderID, u);
+      }
+      global.GoatBot.onReply.delete(Reply.messageID);
+      return message.reply(`❌ ভুল উত্তর!\n✔ সঠিক উত্তর: ${correct.toUpperCase()}\n💸 হারালেন: $${bet}`);
+    }
+  }
 };
