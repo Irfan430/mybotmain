@@ -4,15 +4,11 @@ const { config } = GoatBot;
 const { log, getText } = utils;
 const { creatingThreadData, creatingUserData } = global.client.database;
 
-/**
- * Safe helpers
- */
 function safeThreadName(event, fallbackId) {
-  // event/threadInfo থেকে নাম চেষ্টা করো; না পেলে ডিফল্ট
   return (
     event?.threadName ||
-    event?.thread_info?.name || // কিছু lib এ এইভাবে আসে
-    event?.threadInfo?.name ||  // FCA getThreadInfo() রেজাল্ট
+    event?.thread_info?.name ||
+    event?.threadInfo?.name ||
     `group_${fallbackId || "unknown"}`
   );
 }
@@ -26,79 +22,53 @@ module.exports = async function (usersData, threadsData, event) {
     try {
       if (global.temp.createThreadDataError.includes(threadID)) return;
 
-      const findInCreatingThreadData = creatingThreadData.find(
-        (t) => t.threadID == threadID
-      );
+      const findInCreatingThreadData =
+        creatingThreadData.find(t => t.threadID == threadID);
 
-      // যদি অন্য কোনো async ক্রিয়েশন ইতিমধ্যে প্রগ্রেসে থাকে
-      if (findInCreatingThreadData) {
-        await findInCreatingThreadData.promise;
-      } else {
-        // নতুন ক্রিয়েশনের প্রমিস রেজিস্টার
+      if (!findInCreatingThreadData) {
+        // cache এ থাকলে স্কিপ
+        if (global.db.allThreadData?.some?.(t => t.threadID == threadID)) return;
+
+        // create queue-তে রেজিস্টার (double create এড়াতে)
         let resolvePromise, rejectPromise;
-        const creatingPromise = new Promise((res, rej) => {
-          resolvePromise = res;
-          rejectPromise = rej;
-        });
-        creatingThreadData.push({
-          threadID,
-          promise: creatingPromise,
-        });
+        const creatingPromise = new Promise((res, rej) => { resolvePromise = res; rejectPromise = rej; });
+        creatingThreadData.push({ threadID, promise: creatingPromise });
 
         try {
-          // আগে থ্রেড ডাটা আছে কিনা দেখো
-          const exists = await threadsData.get(threadID).catch(() => null);
-          if (!exists) {
-            // threadName resolve
-            let threadName = event?.threadName || null;
+          // থ্রেড ডাটা তৈরি (framework অনুযায়ী create(threadID))
+          const threadData = await threadsData.create(threadID).catch(() => null);
 
-            // না থাকলে API চেষ্টা
-            if (!threadName && typeof global.api?.getThreadInfo === "function") {
-              const info = await global.api.getThreadInfo(threadID).catch(() => null);
-              threadName = info?.name || null;
-            }
+          // লগ সেফ: threadData নাল হলে ফেলে দিও না
+          const tName = threadData?.threadName || safeThreadName(event, threadID);
+          log.info("DATABASE", `New Thread: ${threadID} | ${tName} | ${config.database.type}`);
 
-            // একদমই না পেলে ফালব্যাক
-            if (!threadName) threadName = safeThreadName(event, threadID);
+          // ✅ Auto-Approve: নতুন থ্রেডেই অ্যাপ্রুভ অন করে দাও, যাতে বট রিপ্লাই দেয়
+          await threadsData.update(threadID, d => {
+            d.settings ??= {};
+            d.settings.approval = { status: true, approvedBy: "system", at: Date.now() };
+            // fallback data গুলোও সেফ করে রাখি
+            d.threadName ||= tName;
+            d.isGroup = event?.isGroup === true;
+            d.participants = Array.isArray(event?.participantIDs) ? event.participantIDs.map(String) : (d.participants || []);
+            return d;
+          }).catch(() => {});
 
-            // participants
-            const participants = Array.isArray(event?.participantIDs)
-              ? event.participantIDs.map(String)
-              : [];
-
-            await threadsData.create({
-              threadID,
-              threadName,
-              isGroup: event?.isGroup === true,
-              participants,
-              settings: {},
-              data: {}
-            });
-
-            log.info(
-              "DATABASE",
-              `New Thread: ${threadID} | ${threadName} | ${config.database.type}`
-            );
-          }
           resolvePromise();
         } catch (err) {
           rejectPromise(err);
-          if (err?.name !== "DATA_ALREADY_EXISTS") {
+          if (err?.name != "DATA_ALREADY_EXISTS") {
             global.temp.createThreadDataError.push(threadID);
-            log.err(
-              "DATABASE",
-              getText("handlerCheckData", "cantCreateThread", threadID),
-              err
-            );
+            log.err("DATABASE", getText("handlerCheckData", "cantCreateThread", threadID), err);
           }
         } finally {
-          // queue থেকে এই থ্রেড রেজিস্ট্রি সরাও
-          const idx = creatingThreadData.findIndex((t) => t.threadID == threadID);
+          const idx = creatingThreadData.findIndex(t => t.threadID == threadID);
           if (idx > -1) creatingThreadData.splice(idx, 1);
         }
+      } else {
+        // চলমান ক্রিয়েশন থাকলে ওটাই শেষ হওয়া পর্যন্ত অপেক্ষা
+        await findInCreatingThreadData.promise;
       }
     } catch (err) {
-      // কোনো অপ্রত্যাশিত নাল/টাইপ ইস্যু হলে বট থামবে না
       log.err("DATABASE", "Unexpected error while checking thread data", err);
     }
   }
@@ -106,24 +76,24 @@ module.exports = async function (usersData, threadsData, event) {
   // ————————————— CHECK USER DATA ————————————— //
   if (senderID) {
     try {
-      const findInCreatingUserData = creatingUserData.find((u) => u.userID == senderID);
+      const findInCreatingUserData =
+        creatingUserData.find(u => u.userID == senderID);
 
       if (!findInCreatingUserData) {
-        const exists = await usersData.get(senderID).catch(() => null);
-        if (!exists) {
-          const userData = await usersData.create(senderID);
-          log.info(
-            "DATABASE",
-            `New User: ${senderID} | ${userData?.name || "unknown"} | ${config.database.type}`
-          );
-        }
+        // cache এ থাকলে স্কিপ
+        if (db.allUserData?.some?.(u => u.userID == senderID)) return;
+
+        const userData = await usersData.create(senderID).catch(() => null);
+        log.info(
+          "DATABASE",
+          `New User: ${senderID} | ${userData?.name || "unknown"} | ${config.database.type}`
+        );
       } else {
         await findInCreatingUserData.promise;
       }
     } catch (err) {
-      if (err?.name !== "DATA_ALREADY_EXISTS") {
+      if (err?.name != "DATA_ALREADY_EXISTS")
         log.err("DATABASE", getText("handlerCheckData", "cantCreateUser", senderID), err);
-      }
     }
   }
 };
