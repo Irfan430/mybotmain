@@ -1,4 +1,4 @@
-const { createCanvas, loadImage } = require('canvas');
+const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 
@@ -6,7 +6,7 @@ module.exports = {
   config: {
     name: "wheel",
     version: "3.1",
-    author: "IRFAN",
+    author: "xnil6x",
     shortDescription: "🎡 Ultra-Stable Wheel Game",
     longDescription: "Guaranteed smooth spinning experience with automatic fail-safes",
     category: "Game",
@@ -46,25 +46,13 @@ module.exports = {
       // Send initial spinning message
       await api.sendMessage("🌀 Starting the wheel...", threadID);
       
-      // Generate spinning animation frames
-      const frames = await this.generateSpinningFrames();
-      
-      // Send each frame with a delay to simulate spinning
-      for (let i = 0; i < frames.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await api.sendMessage({
-          body: i === frames.length - 1 ? "🎡 Wheel is stopping..." : "🌀 Wheel is spinning...",
-          attachment: frames[i]
-        }, threadID);
-      }
-
       // Get the result
       const { result, winAmount } = await this.executeSpin(betAmount);
       const newBalance = user.money + winAmount;
 
       await usersData.set(senderID, { money: newBalance });
 
-      // Generate final result canvas
+      // Generate result canvas
       const resultCanvas = await this.generateResultCanvas(result, winAmount, betAmount, newBalance);
       
       return api.sendMessage({
@@ -141,104 +129,6 @@ module.exports = {
     }
     
     return amount.toFixed(amount % 1 ? 2 : 0) + units[unitIndex];
-  },
-
-  async generateSpinningFrames() {
-    const wheelSegments = [
-      { emoji: "🍒", multiplier: 0.5, weight: 20, color: "#ff0000" },
-      { emoji: "🍋", multiplier: 1, weight: 30, color: "#ffff00" },
-      { emoji: "🍊", multiplier: 2, weight: 25, color: "#ffa500" }, 
-      { emoji: "🍇", multiplier: 3, weight: 15, color: "#800080" },
-      { emoji: "💎", multiplier: 5, weight: 7, color: "#00ffff" },
-      { emoji: "💰", multiplier: 10, weight: 3, color: "#ffd700" }
-    ];
-
-    const frames = [];
-    const frameCount = 10; // Number of spinning frames
-    
-    for (let i = 0; i < frameCount; i++) {
-      const canvas = createCanvas(500, 500);
-      const ctx = canvas.getContext('2d');
-      
-      // Draw background
-      ctx.fillStyle = '#0a0a2a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw wheel
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const radius = 200;
-      
-      // Draw wheel base
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#1a1a4a';
-      ctx.fill();
-      ctx.strokeStyle = '#00ffff';
-      ctx.lineWidth = 5;
-      ctx.stroke();
-      
-      // Draw segments with rotation for spinning effect
-      const totalWeight = wheelSegments.reduce((sum, seg) => sum + seg.weight, 0);
-      let startAngle = (i * 0.5) % (Math.PI * 2); // Rotate with each frame
-      
-      for (const segment of wheelSegments) {
-        const sliceAngle = (segment.weight / totalWeight) * Math.PI * 2;
-        const endAngle = startAngle + sliceAngle;
-        
-        // Draw segment
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-        ctx.closePath();
-        ctx.fillStyle = segment.color;
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Draw segment text
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(startAngle + sliceAngle / 2);
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.font = 'bold 30px Arial';
-        ctx.fillStyle = '#000000';
-        ctx.fillText(segment.emoji, radius * 0.7, 0);
-        ctx.fillText(`${segment.multiplier}x`, radius * 0.7, 30);
-        ctx.restore();
-        
-        startAngle = endAngle;
-      }
-      
-      // Draw wheel center
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
-      ctx.fillStyle = '#00ffff';
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      
-      // Draw pointer
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY - radius - 20);
-      ctx.lineTo(centerX - 15, centerY - radius + 10);
-      ctx.lineTo(centerX + 15, centerY - radius + 10);
-      ctx.closePath();
-      ctx.fillStyle = '#ff0000';
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // Convert canvas to buffer
-      const buffer = canvas.toBuffer('image/png');
-      frames.push(buffer);
-    }
-    
-    return frames;
   },
 
   async generateResultCanvas(result, winAmount, betAmount, newBalance) {
@@ -374,7 +264,17 @@ module.exports = {
     ctx.fillText(`NEW BALANCE: ${this.formatMoney(newBalance)}`, centerX, centerY + radius + 100);
     
     // Convert canvas to buffer
-    return canvas.toBuffer('image/png');
+    const buffer = canvas.toBuffer('image/png');
+    const pathSave = path.join(__dirname, 'tmp', 'wheel_result.png');
+    
+    // Ensure tmp directory exists
+    if (!fs.existsSync(path.dirname(pathSave))) {
+      fs.mkdirSync(path.dirname(pathSave), { recursive: true });
+    }
+    
+    fs.writeFileSync(pathSave, buffer);
+    
+    return fs.createReadStream(pathSave);
   },
 
   lightenColor(color, percent) {
