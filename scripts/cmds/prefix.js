@@ -1,94 +1,128 @@
-const os = require("os");
-const axios = require("axios");
+const fs = require("fs-extra");
+const { utils } = global;
 
 module.exports = {
-  config: {
-    name: "uptime",
-    version: "3.1",
-    author: "IRFAN",
-    role: 0,
-    shortDescription: "Show advanced bot uptime info",
-    longDescription: "Display advanced system statistics with performance metrics",
-    category: "system",
-    guide: "{pn}",
-    aliases: ["upt"] // নতুন alias যোগ করা হয়েছে
-  },
+	config: {
+		name: "prefix",
+		version: "1.8",
+		author: "NTKhang + Modified by IRFAN",
+		countDown: 5,
+		role: 0,
+		description: "Change bot prefix in your group or globally",
+		category: "config",
+		guide: {
+			en: "To see current prefix: just type 'prefix'\n"
+				+ "To change group prefix: prefix <new prefix>\n"
+				+ "To change global prefix: prefix <new prefix> -g\n"
+				+ "To reset prefix: prefix reset"
+		}
+	},
 
-  onStart: async function ({ message, threadsData }) {
-    try {
-      // আপটাইম ক্যালকুলেশন
-      const uptime = process.uptime();
-      const days = Math.floor(uptime / (60 * 60 * 24));
-      const hours = Math.floor((uptime % (60 * 60 * 24)) / (60 * 60));
-      const minutes = Math.floor((uptime % (60 * 60)) / 60);
-      const seconds = Math.floor(uptime % 60);
-      const uptimeString = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+	langs: {
+		en: {
+			reset: "✅ Prefix reset to default:\n➡️  System prefix: %1",
+			onlyAdmin: "⛔ Only admin can change the system-wide prefix.",
+			confirmGlobal: "⚙️ Global prefix change requested.\n🪄 React to confirm.",
+			confirmThisThread: "🛠️ Group prefix change requested.\n🪄 React to confirm.",
+			successGlobal: "✅ Global prefix changed successfully!\n🆕 New prefix: %1",
+			successThisThread: "✅ Group prefix updated!\n🆕 New prefix: %1"
+		}
+	},
 
-      // সিস্টেম ইনফো
-      const cpu = os.cpus()[0].model;
-      const cores = os.cpus().length;
-      const platform = os.platform();
-      const arch = os.arch();
-      const nodeVersion = process.version;
-      const hostname = os.hostname();
+	onStart: async function ({ message, role, args, commandName, event, threadsData, getLang }) {
+		// যদি শুধু "prefix" লিখে থাকে (কোন আর্গুমেন্ট নেই)
+		if (args.length === 0) {
+			const systemPrefix = global.GoatBot.config.prefix;
+			const groupPrefix = await threadsData.get(event.threadID, "data.prefix") || systemPrefix;
+			
+			const dateTime = new Date().toLocaleString("en-US", {
+				timeZone: "Asia/Dhaka",
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: true,
+				day: "2-digit",
+				month: "2-digit",
+				year: "numeric"
+			});
 
-      // মেমোরি ইনফো
-      const totalMem = os.totalmem() / 1024 / 1024 / 1024;
-      const freeMem = os.freemem() / 1024 / 1024 / 1024;
-      const usedMem = totalMem - freeMem;
-      const memoryUsage = (usedMem / totalMem) * 100;
+			const [datePart, timePart] = dateTime.split(", ");
 
-      // পারফরম্যান্স মেট্রিক্স
-      const loadAvg = os.loadavg();
-      const cpuLoad = (loadAvg[0] / cores * 100).toFixed(2);
+			const infoBox = `
+╔═══════ Astra⚡Mind ═══════╗
+🌐 𝗚𝗹𝗼𝗯𝗮𝗹 𝗣𝗿𝗲𝗳𝗶𝘅: ${systemPrefix}
+💬 𝗚𝗿𝗼𝘂𝗽 𝗣𝗿𝗲𝗳𝗶𝘅: ${groupPrefix}
+🕒 𝗧𝗶𝗺𝗲: ${timePart}
+📅 𝗗𝗮𝘁𝗲: ${datePart}
+╚══════════════════════╝`;
 
-      // বট ইনফো
-      const prefix = global.GoatBot.config?.PREFIX || "/";
-      const totalThreads = await threadsData.getAll().then(t => t.length);
-      const totalCommands = global.GoatBot.commands.size;
+			return message.reply(infoBox);
+		}
 
-      // নেটওয়ার্ক ইনফো
-      const networkInterfaces = os.networkInterfaces();
-      const ipAddress = Object.values(networkInterfaces)
-        .flat()
-        .find(i => i.family === 'IPv4' && !i.internal)?.address || 'Not Available';
+		if (args[0] === "reset") {
+			await threadsData.set(event.threadID, null, "data.prefix");
+			return message.reply(getLang("reset", global.GoatBot.config.prefix));
+		}
 
-      // ASCII আর্ট এবং ফরম্যাটিং
-      const line = "═".repeat(45);
-      
-      const box = `
-╔${line}╗
-║ 🚀 𝗔𝗦𝗧𝗥𝗔⚡𝗠𝗜𝗡𝗗 𝗩3 𝗔𝗗𝗩𝗔𝗡𝗖𝗘𝗗 𝗦𝗧𝗔𝗧𝗨𝗦
-╟${line}╢
-║ ⏰ 𝗨𝗽𝘁𝗶𝗺𝗲: ${uptimeString}
-║ 🔧 𝗖𝗣𝗨: ${cpu} (${cores} cores)
-║ 📊 𝗖𝗣𝗨 𝗟𝗼𝗮𝗱: ${cpuLoad}%
-║ 🧠 𝗥𝗔𝗠: ${usedMem.toFixed(2)}GB/${totalMem.toFixed(2)}GB (${memoryUsage.toFixed(1)}%)
-║ ${getProgressBar(memoryUsage, 25)}
-║ 💾 𝗣𝗹𝗮𝘁𝗳𝗼𝗿𝗺: ${platform} (${arch})
-║ 🌐 𝗜𝗣 𝗔𝗱𝗱𝗿𝗲𝘀𝘀: ${ipAddress}
-║ 🖥️ 𝗛𝗼𝘀𝘁𝗻𝗮𝗺𝗲: ${hostname}
-║ 📦 𝗡𝗼𝗱𝗲.𝗷𝘀: ${nodeVersion}
-╟${line}╢
-║ 🤖 𝗕𝗼𝘁 𝗦𝘁𝗮𝘁𝘀:
-║   𝗧𝗵𝗿𝗲𝗮𝗱𝘀: ${totalThreads}
-║   𝗖𝗼𝗺𝗺𝗮𝗻𝗱𝘀: ${totalCommands}
-║   𝗣𝗿𝗲𝗳𝗶𝘅: ${prefix}
-╟${line}╢
-║ 👑 𝗗𝗲𝘃𝗲𝗹𝗼𝗽𝗲𝗿: IRFAN
-╚${line}╝`;
+		const newPrefix = args[0];
+		const formSet = {
+			commandName,
+			author: event.senderID,
+			newPrefix,
+			setGlobal: args[1] === "-g"
+		};
 
-      message.reply(box);
-    } catch (error) {
-      console.error('Error in uptime command:', error);
-      message.reply("❌ An error occurred while fetching system information.");
-    }
-  }
+		if (formSet.setGlobal && role < 2)
+			return message.reply(getLang("onlyAdmin"));
+
+		const confirmMsg = formSet.setGlobal ? getLang("confirmGlobal") : getLang("confirmThisThread");
+
+		return message.reply(confirmMsg, (err, info) => {
+			formSet.messageID = info.messageID;
+			global.GoatBot.onReaction.set(info.messageID, formSet);
+		});
+	},
+
+	onReaction: async function ({ message, threadsData, event, Reaction, getLang }) {
+		const { author, newPrefix, setGlobal } = Reaction;
+		if (event.userID !== author) return;
+
+		if (setGlobal) {
+			global.GoatBot.config.prefix = newPrefix;
+			fs.writeFileSync(global.client.dirConfig, JSON.stringify(global.GoatBot.config, null, 2));
+			return message.reply(getLang("successGlobal", newPrefix));
+		} else {
+			await threadsData.set(event.threadID, newPrefix, "data.prefix");
+			return message.reply(getLang("successThisThread", newPrefix));
+		}
+	},
+
+	onChat: async function ({ event, message, threadsData }) {
+		// শুধু "prefix" লিখলেই রেসপন্স দিবে (কোন প্রিফিক্স ছাড়া)
+		if (event.body && event.body.toLowerCase() === "prefix") {
+			const systemPrefix = global.GoatBot.config.prefix;
+			const groupPrefix = await threadsData.get(event.threadID, "data.prefix") || systemPrefix;
+			
+			const dateTime = new Date().toLocaleString("en-US", {
+				timeZone: "Asia/Dhaka",
+				hour: "2-digit",
+				minute: "2-digit",
+				hour12: true,
+				day: "2-digit",
+				month: "2-digit",
+				year: "numeric"
+			});
+
+			const [datePart, timePart] = dateTime.split(", ");
+
+			const infoBox = `
+╔═══════ Astra⚡Mind ═══════╗
+🌐 𝗚𝗹𝗼𝗯𝗮𝗹 𝗣𝗿𝗲𝗳𝗶𝘅: ${systemPrefix}
+💬 𝗚𝗿𝗼𝘂𝗽 𝗣𝗿𝗲𝗳𝗶𝘅: ${groupPrefix}
+🕒 𝗧𝗶𝗺𝗲: ${timePart}
+📅 𝗗𝗮𝘁𝗲: ${datePart}
+╚══════════════════════╝`;
+
+			return message.reply(infoBox);
+		}
+	}
 };
-
-// প্রোগ্রেস বার জেনারেটরের ফাংশন
-function getProgressBar(percent, length) {
-  const filled = Math.round(length * percent / 100);
-  const empty = length - filled;
-  return `▰`.repeat(filled) + `▱`.repeat(empty) + ` ${percent.toFixed(1)}%`;
-}
