@@ -2,11 +2,21 @@ const { createCanvas } = require('canvas');
 const fs = require('fs');
 const path = require('path');
 
+// Define wheel segments at the module level to ensure consistency
+const wheelSegments = [
+  { emoji: "🍒", multiplier: 0.5, weight: 20, color: "#ff0000" },
+  { emoji: "🍋", multiplier: 1, weight: 30, color: "#ffff00" },
+  { emoji: "🍊", multiplier: 2, weight: 25, color: "#ffa500" }, 
+  { emoji: "🍇", multiplier: 3, weight: 15, color: "#800080" },
+  { emoji: "💎", multiplier: 5, weight: 7, color: "#00ffff" },
+  { emoji: "💰", multiplier: 10, weight: 3, color: "#ffd700" }
+];
+
 module.exports = {
   config: {
     name: "wheel",
     version: "3.1",
-    author: "xnil6x",
+    author: "IRFAN",
     shortDescription: "🎡 Ultra-Stable Wheel Game",
     longDescription: "Guaranteed smooth spinning experience with automatic fail-safes",
     category: "Game",
@@ -47,13 +57,13 @@ module.exports = {
       await api.sendMessage("🌀 Starting the wheel...", threadID);
       
       // Get the result
-      const { result, winAmount } = await this.executeSpin(betAmount);
+      const { result, winAmount, resultIndex } = await this.executeSpin(betAmount);
       const newBalance = user.money + winAmount;
 
       await usersData.set(senderID, { money: newBalance });
 
-      // Generate result canvas
-      const resultCanvas = await this.generateResultCanvas(result, winAmount, betAmount, newBalance);
+      // Generate result canvas with the correct segment position
+      const resultCanvas = await this.generateResultCanvas(result, winAmount, betAmount, newBalance, resultIndex);
       
       return api.sendMessage({
         body: this.generateResultText(result, winAmount, betAmount, newBalance),
@@ -79,27 +89,20 @@ module.exports = {
   },
 
   async executeSpin(betAmount) {
-    const wheelSegments = [
-      { emoji: "🍒", multiplier: 0.5, weight: 20, color: "#ff0000" },
-      { emoji: "🍋", multiplier: 1, weight: 30, color: "#ffff00" },
-      { emoji: "🍊", multiplier: 2, weight: 25, color: "#ffa500" }, 
-      { emoji: "🍇", multiplier: 3, weight: 15, color: "#800080" },
-      { emoji: "💎", multiplier: 5, weight: 7, color: "#00ffff" },
-      { emoji: "💰", multiplier: 10, weight: 3, color: "#ffd700" }
-    ];
-
     const totalWeight = wheelSegments.reduce((sum, seg) => sum + seg.weight, 0);
     const randomValue = Math.random() * totalWeight;
     let cumulativeWeight = 0;
+    let resultIndex = 0;
 
-    const result = wheelSegments.find(segment => {
+    const result = wheelSegments.find((segment, index) => {
       cumulativeWeight += segment.weight;
+      resultIndex = index;
       return randomValue <= cumulativeWeight;
     }) || wheelSegments[0];
 
     const winAmount = Math.floor(betAmount * result.multiplier) - betAmount;
 
-    return { result, winAmount };
+    return { result, winAmount, resultIndex };
   },
 
   generateResultText: function(result, winAmount, betAmount, newBalance) {
@@ -131,7 +134,7 @@ module.exports = {
     return amount.toFixed(amount % 1 ? 2 : 0) + units[unitIndex];
   },
 
-  async generateResultCanvas(result, winAmount, betAmount, newBalance) {
+  async generateResultCanvas(result, winAmount, betAmount, newBalance, resultIndex) {
     const canvas = createCanvas(600, 500);
     const ctx = canvas.getContext('2d');
     
@@ -162,18 +165,29 @@ module.exports = {
     ctx.lineWidth = 5;
     ctx.stroke();
     
-    // Draw winning segment highlighted
-    const wheelSegments = [
-      { emoji: "🍒", multiplier: 0.5, weight: 20, color: "#ff0000" },
-      { emoji: "🍋", multiplier: 1, weight: 30, color: "#ffff00" },
-      { emoji: "🍊", multiplier: 2, weight: 25, color: "#ffa500" }, 
-      { emoji: "🍇", multiplier: 3, weight: 15, color: "#800080" },
-      { emoji: "💎", multiplier: 5, weight: 7, color: "#00ffff" },
-      { emoji: "💰", multiplier: 10, weight: 3, color: "#ffd700" }
-    ];
-    
+    // Calculate the rotation angle based on the result index
     const totalWeight = wheelSegments.reduce((sum, seg) => sum + seg.weight, 0);
     let startAngle = 0;
+    
+    // Calculate the angle where the winning segment should be positioned
+    let cumulativeWeight = 0;
+    for (let i = 0; i < resultIndex; i++) {
+      cumulativeWeight += wheelSegments[i].weight;
+    }
+    
+    // Calculate the rotation needed to position the winning segment at the pointer
+    const segmentStartAngle = (cumulativeWeight / totalWeight) * Math.PI * 2;
+    const segmentMiddleAngle = segmentStartAngle + (wheelSegments[resultIndex].weight / totalWeight) * Math.PI;
+    
+    // The pointer is at the top (270 degrees or -90 degrees)
+    // We need to rotate the wheel so the winning segment is at the pointer
+    const pointerAngle = -Math.PI / 2; // Top position (270 degrees)
+    const rotationAngle = pointerAngle - segmentMiddleAngle;
+    
+    // Draw segments with rotation
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rotationAngle);
     
     for (const segment of wheelSegments) {
       const sliceAngle = (segment.weight / totalWeight) * Math.PI * 2;
@@ -181,8 +195,8 @@ module.exports = {
       
       // Draw segment
       ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, radius, startAngle, endAngle);
       ctx.closePath();
       
       if (segment.emoji === result.emoji) {
@@ -202,8 +216,8 @@ module.exports = {
       
       // Draw segment text
       ctx.save();
-      ctx.translate(centerX, centerY);
-      ctx.rotate(startAngle + sliceAngle / 2);
+      const textAngle = startAngle + sliceAngle / 2;
+      ctx.rotate(textAngle);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.font = 'bold 24px Arial';
@@ -215,17 +229,19 @@ module.exports = {
       startAngle = endAngle;
     }
     
-    // Reset shadow
-    ctx.shadowBlur = 0;
-    
     // Draw wheel center
     ctx.beginPath();
-    ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
     ctx.fillStyle = '#00ffff';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     ctx.stroke();
+    
+    ctx.restore(); // Restore to original transformation
+    
+    // Reset shadow
+    ctx.shadowBlur = 0;
     
     // Draw pointer
     ctx.beginPath();
