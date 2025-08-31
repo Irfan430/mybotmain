@@ -6,7 +6,7 @@ module.exports = {
   config: {
     name: "wheel",
     version: "3.1",
-    author: "xnil6x",
+    author: "IRFAN",
     shortDescription: "🎡 Ultra-Stable Wheel Game",
     longDescription: "Guaranteed smooth spinning experience with automatic fail-safes",
     category: "Game",
