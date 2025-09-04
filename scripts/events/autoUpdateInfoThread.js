@@ -1,7 +1,7 @@
 module.exports = {
 	config: {
 		name: "autoUpdateThreadInfo",
-		version: "1.4",
+		version: "1.5",
 		author: "NTKhang",
 		category: "events"
 	},
