@@ -7,7 +7,7 @@ module.exports = {
 		author: "NTKhang",
 		description: "Loop to all event in global.GoatBot.onEvent and run when have new event",
 		category: "events"
-	}
+	},
 
 	onStart: async ({ api, args, message, event, threadsData, usersData, dashBoardData, threadModel, userModel, dashBoardModel, role, commandName }) => {
 		for (const item of allOnEvent) {
