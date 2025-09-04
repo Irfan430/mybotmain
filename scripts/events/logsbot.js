@@ -1,4 +1,5 @@
 const { getTime } = global.utils;
+
 module.exports = {
 	config: {
 		name: "logsbot",
