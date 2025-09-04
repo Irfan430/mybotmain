@@ -1,7 +1,7 @@
 module.exports = {
 	config: {
 		name: "checkwarn",
-		version: "1.3",
+		version: "1.3.0",
 		author: "NTKhang",
 		category: "events"
 	},
