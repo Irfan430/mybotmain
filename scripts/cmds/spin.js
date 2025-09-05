@@ -158,7 +158,7 @@ module.exports = {
     config: {
         name: "spin",
         version: "5.1",
-        author: "XNIL + Enhanced by IRFAN",
+        author: "IRFAN",
         countDown: 5,
         role: 0,
         description: "Spin and win/loss money with futuristic interface. Use '/spin <amount>' or '/spin top'.",
