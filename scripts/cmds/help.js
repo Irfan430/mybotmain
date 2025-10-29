@@ -1,366 +1,250 @@
-const fs = require("fs");
+const fs = require("fs-extra");
 const path = require("path");
-const { createCanvas, loadImage, registerFont } = require('canvas');
+const axios = require('axios');
 const { getPrefix } = global.utils;
 const { commands, aliases } = global.GoatBot;
-
-// Try to register robotic-style fonts
-try {
-    registerFont(path.join(__dirname, 'fonts', 'Orbitron-Bold.ttf'), { family: 'Orbitron', weight: 'bold' });
-    registerFont(path.join(__dirname, 'fonts', 'RobotoMono-Italic.ttf'), { family: 'Roboto Mono', style: 'italic' });
-} catch (e) {
-    console.log('Custom fonts not found, using default fonts');
-}
 
 module.exports = {
     config: {
         name: "help",
-        version: "4.5",
-        author: "𝕴𝖗𝖋𝖆𝖓",
+        version: "5.0",
+        author: "IRFAN",
         countDown: 5,
         role: 0,
-        description: "View command information with advanced robotic interface",
+        description: {
+            en: "View all available commands with descriptions and pagination system"
+        },
         category: "info",
         guide: {
-            en: "{pn} [command] - View command details\n{pn} all - View all commands\n{pn} c [category] - View commands in category"
+            en: "{pn} [page] - View commands by page\n{pn} [command] - View command details"
         }
     },
 
     langs: {
         en: {
             helpHeader: "🤖 ASTRA⚡MIND COMMAND SYSTEM",
-            commandNotFound: "⚠️ Command '{command}' not found!",
+            commandNotFound: "❌ Command '{command}' not found!",
             doNotHave: "None",
             roleText0: "👥 All Users",
-            roleText1: "👑 Group Admins",
+            roleText1: "👑 Group Admins", 
             roleText2: "⚡ Bot Admins",
             categoryEmpty: "❌ No commands found in category: {category}",
             totalCommands: "📊 Total Commands: {total}",
             categoryTitle: "📁 Category: {category}",
             commandList: "📋 Command List:",
-            commandDetails: "📋 Command Details: {name}"
+            commandDetails: "📋 Command Details: {name}",
+            pageInfo: "📄 Page {current} of {total}",
+            navigation: "🔍 Use: '{prefix}help page{number}' or reply with page number"
         }
     },
 
     onStart: async function({ message, args, event, threadsData, role, api }) {
-        const { threadID } = event;
+        const { threadID, senderID } = event;
         const prefix = getPrefix(threadID);
-        const commandName = args[0]?.toLowerCase();
         
-        // Get thread information
-        let threadInfo;
-        try {
-            threadInfo = await api.getThreadInfo(threadID);
-        } catch (e) {
-            console.error("Error getting thread info:", e);
-            threadInfo = { threadName: "Unknown Group" };
+        // Get all commands
+        const allCommands = this.getAllCommands(role);
+        const totalPages = Math.ceil(allCommands.length / 8); // 8 commands per page to fit descriptions
+        
+        // Handle page navigation
+        if (args[0] && args[0].startsWith("page")) {
+            const pageNum = parseInt(args[0].replace("page", "")) || 1;
+            return this.showPage(message, pageNum, allCommands, totalPages, prefix, threadID, senderID);
         }
         
-        const groupName = threadInfo.threadName || "Unknown Group";
-        const memberCount = threadInfo.participantIDs ? threadInfo.participantIDs.length : 0;
-        
-        // Bot information
-        const botOwner = "𝕴𝖗𝖋𝖆𝖓";
-        const botName = "ASTRA⚡MIND";
-        const botVersion = "4.5";
-        const globalPrefix = global.GoatBot.config.prefix;
-        
-        // Generate info canvas
-        const infoCanvas = await this.generateInfoCanvas(
-            groupName,
-            memberCount,
-            prefix,
-            globalPrefix,
-            botName,
-            botOwner,
-            botVersion
-        );
-        
-        if (commandName === 'c' && args[1]) {
-            const categoryArg = args[1].toUpperCase();
-            const commandsInCategory = [];
+        // Handle specific command help
+        if (args[0] && !isNaN(parseInt(args[0]))) {
+            const pageNum = parseInt(args[0]);
+            return this.showPage(message, pageNum, allCommands, totalPages, prefix, threadID, senderID);
+        }
 
-            for (const [name, cmd] of commands) {
-                if (cmd.config.role > 1 && role < cmd.config.role) continue;
-                const category = cmd.config.category?.toUpperCase() || "GENERAL";
-                if (category === categoryArg) {
-                    commandsInCategory.push({ name });
-                }
+        if (args[0]) {
+            const commandName = args[0].toLowerCase();
+            let cmd = commands.get(commandName) || commands.get(aliases.get(commandName));
+            
+            if (!cmd) {
+                return message.reply(
+                    this.langs.en.commandNotFound.replace(/{command}/g, commandName)
+                );
             }
 
-            if (commandsInCategory.length === 0) {
-                return message.reply(this.langs.en.categoryEmpty.replace(/{category}/g, categoryArg));
+            const config = cmd.config;
+            
+            // Get description in English or fallback
+            const description = config.description?.en || config.description || "No description available";
+            const aliasesList = config.aliases?.join(", ") || this.langs.en.doNotHave;
+            const category = config.category?.toUpperCase() || "GENERAL";
+            
+            let roleText;
+            switch(config.role) {
+                case 1: roleText = this.langs.en.roleText1; break;
+                case 2: roleText = this.langs.en.roleText2; break;
+                default: roleText = this.langs.en.roleText0;
             }
             
-            let commandList = this.langs.en.categoryTitle.replace(/{category}/g, categoryArg) + "\n\n";
-            commandsInCategory.sort((a, b) => a.name.localeCompare(b.name)).forEach(cmd => {
-                commandList += `• ${cmd.name}\n`;
-            });
+            // Get guide in English or fallback
+            let guide = config.guide?.en || config.usage || config.guide || "No usage guide available";
+            if (typeof guide === "object") guide = guide.body;
+            guide = guide.replace(/\{prefix\}/g, prefix).replace(/\{name\}/g, config.name).replace(/\{pn\}/g, prefix + config.name);
             
-            commandList += `\n${this.langs.en.totalCommands.replace(/{total}/g, commandsInCategory.length)}`;
+            // Get bot info from config
+            const botConfig = global.GoatBot.config;
+            const botName = botConfig.nickNameBot || "ASTRA⚡MIND";
+            const botAdmins = botConfig.adminBot || [];
+            const developers = botConfig.developers || [];
+            const isDeveloper = developers.includes(senderID);
+            const isAdmin = botAdmins.includes(senderID);
+            
+            let commandDetails = 
+                `🤖 **${botName} COMMAND DETAILS**\n\n` +
+                `📝 **Command:** ${config.name}\n` +
+                `📋 **Description:** ${description}\n` +
+                `📁 **Category:** ${category}\n` +
+                `🔤 **Aliases:** ${aliasesList}\n` +
+                `🏷️ **Version:** ${config.version}\n` +
+                `🔒 **Permissions:** ${roleText}\n` +
+                `⏱️ **Cooldown:** ${config.countDown || 1}s\n` +
+                `👤 **Author:** ${config.author || "Unknown"}\n\n` +
+                `🛠️ **Usage:**\n${guide}\n\n` +
+                `👑 **Your Role:** ${isDeveloper ? "⚡ Developer" : isAdmin ? "🔧 Admin" : "👥 User"}\n` +
+                `⚡ **Developed by IRFAN**\n` +
+                `🔧 ${botName} System v5.0`;
 
             return message.reply({
-                body: commandList,
-                attachment: infoCanvas
+                body: commandDetails,
+                attachment: await this.getHelpImage()
             });
         }
 
-        if (!commandName || commandName === 'all') {
-            const categories = new Map();
-            let totalCommands = 0;
+        // Default: show page 1
+        return this.showPage(message, 1, allCommands, totalPages, prefix, threadID, senderID);
+    },
 
-            for (const [name, cmd] of commands) {
-                if (cmd.config.role > 1 && role < cmd.config.role) continue;
-
-                const category = cmd.config.category?.toUpperCase() || "GENERAL";
-                if (!categories.has(category)) {
-                    categories.set(category, []);
+    onChat: async function({ event, message, threadsData }) {
+        const { senderID, threadID } = event;
+        
+        // Handle reply navigation
+        if (event.type === "message_reply" && event.messageReply.body) {
+            const replyBody = event.messageReply.body;
+            if (replyBody.includes("COMMAND SYSTEM") || replyBody.includes("COMMAND LIST")) {
+                const pageMatch = replyBody.match(/📄 Page (\d+) of (\d+)/);
+                if (pageMatch) {
+                    const currentPage = parseInt(pageMatch[1]);
+                    const totalPages = parseInt(pageMatch[2]);
+                    
+                    const messageText = event.body?.toLowerCase().trim();
+                    const requestedPage = parseInt(messageText);
+                    
+                    if (!isNaN(requestedPage) && requestedPage >= 1 && requestedPage <= totalPages) {
+                        const allCommands = this.getAllCommands(0); // Default role for chat
+                        return this.showPage(message, requestedPage, allCommands, totalPages, getPrefix(threadID), threadID, senderID);
+                    }
                 }
-                categories.get(category).push({ name });
-                totalCommands++;
             }
+        }
+        
+        // Handle "help" in chat
+        const messageText = event.body?.toLowerCase().trim();
+        if (messageText === "help") {
+            const allCommands = this.getAllCommands(0);
+            const totalPages = Math.ceil(allCommands.length / 8);
+            return this.showPage(message, 1, allCommands, totalPages, getPrefix(threadID), threadID, senderID);
+        }
+    },
 
-            const sortedCategories = [...categories.keys()].sort();
-            let commandList = this.langs.en.commandList + "\n\n";
+    // Get all commands filtered by role
+    getAllCommands: function(role) {
+        const commandList = [];
+        
+        for (const [name, cmd] of commands) {
+            if (cmd.config.role > 1 && role < cmd.config.role) continue;
             
-            for (const category of sortedCategories) {
-                const commandsInCategory = categories.get(category).sort((a, b) => a.name.localeCompare(b.name));
-                
-                commandList += `📁 ${category} (${commandsInCategory.length} commands):\n`;
-                
-                // Show only first 5 commands per category to avoid message being too long
-                commandsInCategory.slice(0, 5).forEach(cmd => {
-                    commandList += `• ${cmd.name}\n`;
-                });
-                
-                if (commandsInCategory.length > 5) {
-                    commandList += `• ...${commandsInCategory.length - 5} more commands\n`;
-                }
-                
-                commandList += "\n";
-            }
+            const category = cmd.config.category?.toUpperCase() || "GENERAL";
             
-            commandList += this.langs.en.totalCommands.replace(/{total}/g, totalCommands);
-            commandList += `\n\nUse "${prefix}help c [category]" to see all commands in a category`;
-            commandList += `\nUse "${prefix}help [command]" to see details of a specific command`;
-
-            return message.reply({
-                body: commandList,
-                attachment: infoCanvas
+            // Get description in English or fallback to regular description
+            const description = cmd.config.description?.en || cmd.config.description || "No description available";
+            
+            commandList.push({
+                name,
+                category,
+                description: description,
+                role: cmd.config.role
             });
         }
-
-        let cmd = commands.get(commandName) || commands.get(aliases.get(commandName));
-        if (!cmd) {
-            return message.reply(this.langs.en.commandNotFound.replace(/{command}/g, commandName));
-        }
-
-        const config = cmd.config;
-        const description = config.description?.en || config.description || "No description";
-        const aliasesList = config.aliases?.join(", ") || this.langs.en.doNotHave;
-        const category = config.category?.toUpperCase() || "GENERAL";
         
-        let roleText;
-        switch(config.role) {
-            case 1: roleText = this.langs.en.roleText1; break;
-            case 2: roleText = this.langs.en.roleText2; break;
-            default: roleText = this.langs.en.roleText0;
-        }
-        
-        let guide = config.guide?.en || config.usage || config.guide || "No usage guide available";
-        if (typeof guide === "object") guide = guide.body;
-        guide = guide.replace(/\{prefix\}/g, prefix).replace(/\{name\}/g, config.name).replace(/\{pn\}/g, prefix + config.name);
-        
-        let commandDetails = this.langs.en.commandDetails.replace(/{name}/g, config.name) + "\n\n";
-        commandDetails += `📝 Description: ${description}\n`;
-        commandDetails += `📂 Category: ${category}\n`;
-        commandDetails += `🔤 Aliases: ${aliasesList}\n`;
-        commandDetails += `🏷️ Version: ${config.version}\n`;
-        commandDetails += `🔒 Permissions: ${roleText}\n`;
-        commandDetails += `⏱️ Cooldown: ${config.countDown || 1}s\n`;
-        commandDetails += `👤 Author: ${config.author || "Unknown"}\n\n`;
-        commandDetails += `🛠️ Usage:\n${guide}`;
-
-        return message.reply({
-            body: commandDetails,
-            attachment: infoCanvas
+        // Sort by category and name
+        return commandList.sort((a, b) => {
+            if (a.category !== b.category) {
+                return a.category.localeCompare(b.category);
+            }
+            return a.name.localeCompare(b.name);
         });
     },
 
-    generateInfoCanvas: async function(groupName, memberCount, groupPrefix, globalPrefix, botName, botOwner, botVersion) {
-        const canvas = createCanvas(800, 500);
-        const ctx = canvas.getContext('2d');
-        
-        // Draw futuristic background
-        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-        gradient.addColorStop(0, '#001125');
-        gradient.addColorStop(0.5, '#001933');
-        gradient.addColorStop(1, '#000d1a');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Draw advanced circuit patterns
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
-        ctx.lineWidth = 1;
-        
-        // Draw grid lines
-        for (let y = 40; y < canvas.height; y += 35) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-        }
-        
-        for (let x = 40; x < canvas.width; x += 35) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, canvas.height);
-            ctx.stroke();
+    // Show specific page
+    showPage: async function(message, pageNum, allCommands, totalPages, prefix, threadID, senderID) {
+        if (pageNum < 1 || pageNum > totalPages) {
+            return message.reply(`❌ Invalid page number! Please choose between 1 and ${totalPages}`);
         }
 
-        // Draw circuit nodes with glow effect
-        for (let y = 40; y < canvas.height; y += 35) {
-            for (let x = 40; x < canvas.width; x += 35) {
-                // Outer glow
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
-                ctx.fill();
-                
-                // Inner node
-                ctx.beginPath();
-                ctx.arc(x, y, 2, 0, Math.PI * 2);
-                ctx.fillStyle = '#00ffff';
-                ctx.fill();
+        const startIndex = (pageNum - 1) * 8;
+        const endIndex = Math.min(startIndex + 8, allCommands.length);
+        const pageCommands = allCommands.slice(startIndex, endIndex);
+
+        // Get bot info from config
+        const botConfig = global.GoatBot.config;
+        const botName = botConfig.nickNameBot || "ASTRA⚡MIND";
+        const botAdmins = botConfig.adminBot || [];
+        const developers = botConfig.developers || [];
+        const isDeveloper = developers.includes(senderID);
+        const isAdmin = botAdmins.includes(senderID);
+
+        let commandList = 
+            `🤖 **${botName} COMMAND SYSTEM**\n\n` +
+            `📋 **COMMAND LIST**\n` +
+            `📄 Page ${pageNum} of ${totalPages}\n\n`;
+
+        let currentCategory = "";
+        pageCommands.forEach((cmd, index) => {
+            if (cmd.category !== currentCategory) {
+                currentCategory = cmd.category;
+                commandList += `\n📁 ${currentCategory}:\n`;
             }
-        }
+            
+            let roleIcon = "👥";
+            if (cmd.role === 1) roleIcon = "👑";
+            if (cmd.role === 2) roleIcon = "⚡";
+            
+            // Show command with description on the same line
+            commandList += `${roleIcon} **${cmd.name}**\n`;
+            commandList += `   📝 ${cmd.description}\n\n`;
+        });
 
-        // Draw data streams
-        for (let i = 0; i < 3; i++) {
-            const startX = Math.random() * canvas.width;
-            const startY = Math.random() * canvas.height;
-            
-            const streamGradient = ctx.createLinearGradient(startX, startY, startX + 200, startY + 200);
-            streamGradient.addColorStop(0, 'rgba(0, 255, 255, 0)');
-            streamGradient.addColorStop(0.5, 'rgba(0, 255, 255, 0.6)');
-            streamGradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
-            
-            ctx.strokeStyle = streamGradient;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.bezierCurveTo(
-                startX + 100, startY - 50,
-                startX + 150, startY + 100,
-                startX + 200, startY + 50
-            );
-            ctx.stroke();
-        }
-        
-        // Draw main header
-        ctx.font = 'bold 32px Orbitron, Arial';
-        const titleText = '🤖 ASTRA⚡MIND SYSTEM INFO';
-        
-        // Text shadow
-        ctx.fillStyle = 'rgba(0, 200, 255, 0.5)';
-        ctx.fillText(titleText, canvas.width/2 - ctx.measureText(titleText).width/2 + 2, 42);
-        
-        // Main text
-        ctx.fillStyle = '#00ffff';
-        ctx.fillText(titleText, canvas.width/2 - ctx.measureText(titleText).width/2, 40);
-        
-        // Draw info box
-        const boxWidth = 700;
-        const boxHeight = 350;
-        const boxX = (canvas.width - boxWidth) / 2;
-        const boxY = 70;
-        
-        // Box background
-        ctx.fillStyle = 'rgba(0, 20, 40, 0.7)';
-        ctx.strokeStyle = '#00ffff';
-        ctx.lineWidth = 3;
-        roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 15);
-        
-        // Draw group info
-        ctx.font = 'bold 24px Orbitron, Arial';
-        ctx.fillStyle = '#00ffaa';
-        ctx.textAlign = 'left';
-        ctx.fillText('👥 GROUP INFORMATION', boxX + 20, boxY + 35);
-        
-        ctx.font = 'bold 20px Orbitron, Arial';
-        ctx.fillStyle = '#ffffff';
-        
-        const groupInfoLines = [
-            `💬 Name: ${groupName}`,
-            `👨‍👩‍👧‍👦 Members: ${memberCount}`,
-            `🔤 Prefix: ${groupPrefix}`
-        ];
-        
-        groupInfoLines.forEach((line, i) => {
-            ctx.fillText(line, boxX + 30, boxY + 70 + (i * 35));
+        commandList += 
+            `📊 **Total Commands:** ${allCommands.length}\n` +
+            `👑 **Your Role:** ${isDeveloper ? "⚡ Developer" : isAdmin ? "🔧 Admin" : "👥 User"}\n\n` +
+            `🔍 **Navigation:**\n` +
+            `• Use "${prefix}help page[number]" (e.g., "${prefix}help page2")\n` +
+            `• Reply to this message with page number\n` +
+            `• Use "${prefix}help [command]" for details\n\n` +
+            `⚡ **Developed by IRFAN**\n` +
+            `🔧 ${botName} System v5.0`;
+
+        return message.reply({
+            body: commandList,
+            attachment: await this.getHelpImage()
         });
-        
-        // Draw separator
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(boxX + 20, boxY + 150);
-        ctx.lineTo(boxX + boxWidth - 20, boxY + 150);
-        ctx.stroke();
-        
-        // Draw bot info
-        ctx.font = 'bold 24px Orbitron, Arial';
-        ctx.fillStyle = '#00ffaa';
-        ctx.fillText('🤖 BOT INFORMATION', boxX + 20, boxY + 185);
-        
-        ctx.font = 'bold 20px Orbitron, Arial';
-        ctx.fillStyle = '#ffffff';
-        
-        const botInfoLines = [
-            `🌐 Name: ${botName}`,
-            `⚡ Version: ${botVersion}`,
-            `🔤 Global Prefix: ${globalPrefix}`,
-            `👑 Owner: ${botOwner}`
-        ];
-        
-        botInfoLines.forEach((line, i) => {
-            ctx.fillText(line, boxX + 30, boxY + 220 + (i * 35));
-        });
-        
-        // Draw footer
-        ctx.font = 'italic 16px Roboto Mono, Arial';
-        ctx.fillStyle = '#00aaaa';
-        ctx.textAlign = 'center';
-        ctx.fillText('Type "help" in chat to see command list', canvas.width/2, boxY + boxHeight + 30);
-        
-        // Convert canvas to buffer
-        const buffer = canvas.toBuffer('image/png');
-        const pathSave = path.join(__dirname, 'tmp', 'info_canvas.png');
-        
-        // Ensure tmp directory exists
-        if (!fs.existsSync(path.dirname(pathSave))) {
-            fs.mkdirSync(path.dirname(pathSave), { recursive: true });
+    },
+
+    // Function to get help image
+    getHelpImage: async function() {
+        try {
+            const imageUrl = "https://i.postimg.cc/59BGv4DD/1730967635406.jpg";
+            const response = await axios.get(imageUrl, { responseType: 'stream' });
+            return response.data;
+        } catch (error) {
+            console.error('Error loading help image:', error);
+            return null;
         }
-        
-        fs.writeFileSync(pathSave, buffer);
-        
-        return fs.createReadStream(pathSave);
     }
 };
-
-// Helper function to draw rounded rectangles
-function roundRect(ctx, x, y, width, height, radius) {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-}
