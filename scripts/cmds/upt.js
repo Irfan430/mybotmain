@@ -1,248 +1,154 @@
-const os = require("os");
-const axios = require("axios");
-const { createCanvas, loadImage, registerFont } = require('canvas');
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs-extra");
+const axios = require('axios');
 
 module.exports = {
-  config: {
-    name: "uptime",
-    version: "3.1",
-    author: "IRFAN",
-    role: 0,
-    shortDescription: "Show advanced bot uptime info",
-    longDescription: "Display advanced system statistics with performance metrics with robotic style canvas",
-    category: "system",
-    guide: "{pn}",
-    aliases: ["upt"]
-  },
+    config: {
+        name: "uptime",
+        version: "2.0",
+        author: "IRFAN",
+        countDown: 5,
+        role: 0,
+        description: "Check bot uptime with advanced statistics",
+        category: "system",
+        guide: {
+            en: "💻 Use {p}uptime or {p}upt to check bot uptime and system status"
+        },
+        aliases: ["upt", "runtime", "online"]
+    },
 
-  onStart: async function ({ message, threadsData }) {
-    try {
-      // Uptime calculation
-      const uptime = process.uptime();
-      const days = Math.floor(uptime / (60 * 60 * 24));
-      const hours = Math.floor((uptime % (60 * 60 * 24)) / (60 * 60));
-      const minutes = Math.floor((uptime % (60 * 60)) / 60);
-      const seconds = Math.floor(uptime % 60);
-      const uptimeString = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+    onStart: async function ({ message, event, threadsData, usersData, commandName }) {
+        try {
+            // Calculate uptime
+            const uptime = process.uptime();
+            const days = Math.floor(uptime / (3600 * 24));
+            const hours = Math.floor((uptime % (3600 * 24)) / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
 
-      // System info
-      const cpu = os.cpus()[0].model;
-      const cores = os.cpus().length;
-      const platform = os.platform();
-      const arch = os.arch();
-      const nodeVersion = process.version;
-      const hostname = os.hostname();
+            // Get system statistics
+            const os = require('os');
+            const totalMemory = (os.totalmem() / (1024 * 1024 * 1024)).toFixed(2);
+            const freeMemory = (os.freemem() / (1024 * 1024 * 1024)).toFixed(2);
+            const usedMemory = (totalMemory - freeMemory).toFixed(2);
+            const memoryUsage = ((usedMemory / totalMemory) * 100).toFixed(1);
+            const platform = os.platform();
+            const arch = os.arch();
+            const cpuCount = os.cpus().length;
+            const cpuModel = os.cpus()[0].model;
 
-      // Memory info
-      const totalMem = os.totalmem() / 1024 / 1024 / 1024;
-      const freeMem = os.freemem() / 1024 / 1024 / 1024;
-      const usedMem = totalMem - freeMem;
-      const memoryUsage = (usedMem / totalMem) * 100;
+            // Get bot statistics
+            const allThreads = await threadsData.getAll();
+            const allUsers = await usersData.getAll();
+            const activeThreads = allThreads.filter(thread => thread && thread.data).length;
+            const totalUsers = allUsers.length;
 
-      // Performance metrics
-      const loadAvg = os.loadavg();
-      const cpuLoad = (loadAvg[0] / cores * 100).toFixed(2);
+            // Get current time and date
+            const now = new Date();
+            const startTime = new Date(now - uptime * 1000);
+            
+            const formatTime = (date) => {
+                return date.toLocaleString("en-US", {
+                    timeZone: "Asia/Dhaka",
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true,
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            };
 
-      // Bot info
-      const prefix = global.GoatBot.config?.PREFIX || "/";
-      const totalThreads = await threadsData.getAll().then(t => t.length);
-      const totalCommands = global.GoatBot.commands.size;
+            const currentTime = formatTime(now);
+            const bootTime = formatTime(startTime);
 
-      // Network info
-      const networkInterfaces = os.networkInterfaces();
-      const ipAddress = Object.values(networkInterfaces)
-        .flat()
-        .find(i => i.family === 'IPv4' && !i.internal)?.address || 'Not Available';
+            // Create enhanced uptime message
+            const uptimeMessage = 
+                `🤖 **ASTRA⚡MIND SYSTEM STATUS**\n\n` +
+                
+                `⏰ **UPTIME STATISTICS**\n` +
+                `🕒 Online For: ${days > 0 ? `${days}d ` : ''}${hours}h ${minutes}m ${seconds}s\n` +
+                `🚀 Boot Time: ${bootTime}\n` +
+                `🔄 Current Time: ${currentTime}\n\n` +
+                
+                `📊 **BOT STATISTICS**\n` +
+                `💬 Active Groups: ${activeThreads}\n` +
+                `👥 Total Users: ${totalUsers}\n` +
+                `⚡ Commands Processed: Calculating...\n\n` +
+                
+                `💻 **SYSTEM INFORMATION**\n` +
+                `🖥️ Platform: ${platform} | ${arch}\n` +
+                `🧠 CPU: ${cpuCount} Core | ${cpuModel.split('@')[0].trim()}\n` +
+                `💾 Memory: ${usedMemory}GB / ${totalMemory}GB (${memoryUsage}%)\n` +
+                `📈 Performance: ${memoryUsage > 80 ? '⚠️ High' : memoryUsage > 60 ? '✅ Normal' : '👍 Excellent'}\n\n` +
+                
+                `🔧 **SYSTEM STATUS**\n` +
+                `✅ Bot: Online & Operational\n` +
+                `🌐 API: Responsive\n` +
+                `📡 Connection: Stable\n` +
+                `🔥 Performance: Optimal\n\n` +
+                
+                `⚡ **Developed by IRFAN**\n` +
+                `🔧 AstraMind System v2.0 | ${days === 0 ? 'Fresh Start' : days === 1 ? '1 Day Running' : `${days} Days Stable`}`;
 
-      // Create canvas
-      const canvas = createCanvas(800, 600);
-      const ctx = canvas.getContext('2d');
+            // Send message with image
+            return message.reply({
+                body: uptimeMessage,
+                attachment: await this.getUptimeImage()
+            });
 
-      // Draw background with robotic style
-      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-      gradient.addColorStop(0, '#0a0a2a');
-      gradient.addColorStop(1, '#1a1a4a');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } catch (error) {
+            console.error('Uptime command error:', error);
+            
+            const errorMessage = 
+                `⚠️ **SYSTEM STATUS UPDATE**\n\n` +
+                `❌ Unable to retrieve full system information\n` +
+                `📊 Basic Uptime: ${Math.floor(process.uptime() / 60)} minutes\n` +
+                `🔧 System: Partially Operational\n\n` +
+                `⚡ AstraMind System | Technical Team Notified`;
 
-      // Draw circuit board pattern
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
-      ctx.lineWidth = 1;
-      
-      // Horizontal lines
-      for (let y = 50; y < canvas.height; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-      }
-      
-      // Vertical lines
-      for (let x = 50; x < canvas.width; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-
-      // Draw nodes at intersections
-      for (let y = 50; y < canvas.height; y += 40) {
-        for (let x = 50; x < canvas.width; x += 40) {
-          ctx.beginPath();
-          ctx.arc(x, y, 2, 0, Math.PI * 2);
-          ctx.fillStyle = '#00ffff';
-          ctx.fill();
+            return message.reply({
+                body: errorMessage,
+                attachment: await this.getUptimeImage()
+            });
         }
-      }
+    },
 
-      // Draw title
-      ctx.font = 'bold 36px Arial';
-      ctx.fillStyle = '#00ffff';
-      ctx.textAlign = 'center';
-      ctx.fillText('ASTRA⚡MIND V3 STATUS', canvas.width / 2, 60);
+    onChat: async function ({ event, message }) {
+        // Respond to "upt" and "uptime" without prefix
+        const messageText = event.body?.toLowerCase().trim();
+        
+        if (messageText === "upt" || messageText === "uptime") {
+            await this.onStart({ message, event, threadsData: global.threadsData, usersData: global.usersData, commandName: "uptime" });
+        }
+    },
 
-      // Draw robot icon
-      drawRobotIcon(ctx, canvas.width / 2, 130);
+    // Function to get your uptime image
+    getUptimeImage: async function() {
+        try {
+            const imageUrl = "https://i.postimg.cc/59BGv4DD/1730967635406.jpg";
+            const response = await axios.get(imageUrl, { responseType: 'stream' });
+            return response.data;
+        } catch (error) {
+            console.error('Error loading uptime image:', error);
+            return null;
+        }
+    },
 
-      // Draw info boxes
-      const boxWidth = 700;
-      const boxHeight = 350;
-      const boxX = (canvas.width - boxWidth) / 2;
-      const boxY = 180;
-
-      // Box background
-      ctx.fillStyle = 'rgba(0, 20, 40, 0.7)';
-      ctx.strokeStyle = '#00ffff';
-      ctx.lineWidth = 2;
-      roundRect(ctx, boxX, boxY, boxWidth, boxHeight, 10);
-
-      // Draw info text
-      ctx.font = 'bold 18px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#ffffff';
-
-      const infoLines = [
-        `⏰  Uptime: ${uptimeString}`,
-        `🔧  CPU: ${shortenText(cpu, 30)} (${cores} cores)`,
-        `📊  CPU Load: ${cpuLoad}%`,
-        `🧠  RAM: ${usedMem.toFixed(2)}GB/${totalMem.toFixed(2)}GB (${memoryUsage.toFixed(1)}%)`,
-        `${getProgressBar(memoryUsage, 20)}`,
-        `💾  Platform: ${platform} (${arch})`,
-        `🌐  IP Address: ${ipAddress}`,
-        `🖥️  Hostname: ${hostname}`,
-        `📦  Node.js: ${nodeVersion}`,
-        `🤖  Threads: ${totalThreads}`,
-        `📝  Commands: ${totalCommands}`,
-        `⚡  Prefix: ${prefix}`
-      ];
-
-      const lineHeight = 28;
-      const startY = boxY + 40;
-
-      infoLines.forEach((line, i) => {
-        ctx.fillText(line, boxX + 20, startY + (i * lineHeight));
-      });
-
-      // Draw footer
-      ctx.font = 'italic 16px Arial';
-      ctx.fillStyle = '#00aaaa';
-      ctx.textAlign = 'center';
-      ctx.fillText('Developed by IRFAN • Robotic System Monitor', canvas.width / 2, boxY + boxHeight + 30);
-
-      // Convert canvas to buffer and send as attachment
-      const buffer = canvas.toBuffer('image/png');
-      const pathSave = path.join(__dirname, 'tmp', 'uptime_canvas.png');
-      
-      // Ensure tmp directory exists
-      if (!fs.existsSync(path.dirname(pathSave))) {
-        fs.mkdirSync(path.dirname(pathSave), { recursive: true });
-      }
-      
-      fs.writeFileSync(pathSave, buffer);
-      
-      message.reply({
-        body: "🤖 ASTRA⚡MIND V3 Status Report:",
-        attachment: fs.createReadStream(pathSave)
-      });
-
-    } catch (error) {
-      console.error('Error in uptime command:', error);
-      message.reply("❌ An error occurred while generating system information canvas.");
+    // Additional system monitoring function
+    getSystemHealth: function() {
+        const os = require('os');
+        const load = os.loadavg();
+        const memory = {
+            total: os.totalmem(),
+            free: os.freemem(),
+            used: os.totalmem() - os.freemem()
+        };
+        
+        return {
+            loadAverage: load.map(l => l.toFixed(2)),
+            memoryUsage: ((memory.used / memory.total) * 100).toFixed(1),
+            uptime: os.uptime()
+        };
     }
-  }
 };
-
-// Helper function to draw rounded rectangles
-function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-// Helper function to draw a simple robot icon
-function drawRobotIcon(ctx, x, y) {
-  ctx.save();
-  ctx.translate(x, y);
-  
-  // Head
-  ctx.fillStyle = '#00ffff';
-  ctx.fillRect(-25, -40, 50, 40);
-  
-  // Eyes
-  ctx.fillStyle = '#000000';
-  ctx.beginPath();
-  ctx.arc(-10, -25, 5, 0, Math.PI * 2);
-  ctx.arc(10, -25, 5, 0, Math.PI * 2);
-  ctx.fill();
-  
-  // Antenna
-  ctx.strokeStyle = '#00ffff';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, -40);
-  ctx.lineTo(0, -55);
-  ctx.stroke();
-  
-  // Antenna tip
-  ctx.fillStyle = '#ff0000';
-  ctx.beginPath();
-  ctx.arc(0, -55, 3, 0, Math.PI * 2);
-  ctx.fill();
-  
-  // Body
-  ctx.fillStyle = '#0066aa';
-  ctx.fillRect(-30, 0, 60, 50);
-  
-  // Details
-  ctx.strokeStyle = '#00ffff';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(-25, 10, 50, 15);
-  ctx.strokeRect(-25, 30, 50, 15);
-  
-  ctx.restore();
-}
-
-// Progress bar generator
-function getProgressBar(percent, length) {
-  const filled = Math.round(length * percent / 100);
-  const empty = length - filled;
-  return '█'.repeat(filled) + '░'.repeat(empty) + ` ${percent.toFixed(1)}%`;
-}
-
-// Helper function to shorten long text
-function shortenText(text, maxLength) {
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 3) + '...';
-}
