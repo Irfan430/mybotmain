@@ -12,7 +12,7 @@
   "antiInbox": false,
   "language": "en",
   "notesLanguage": "change to your language with ISO 639-1 code, available languages: vi (Vietnamese), en (English)",
-  "nickNameBot": "Astra⚡Mind",
+  "nickNameBot": "obito-bot",
   "prefix": "/",
   "adminOnly": {
     "enable": false,
@@ -20,18 +20,18 @@
   },
   "adminBot": [
     "100054167013531",
-    "100084183529883",
+    "100054167013531",
     "100054167013531"
   ],
   "developers": [
     "100054167013531",
     "100054167013531",
-    "100084183529883"
+    "100054167013531"
   ],
   "premium": [
     "100054167013531",
     "100054167013531",
-    "100084183529883"
+    "100054167013531"
   ],
   "whiteListMode": {
     "enable": false,
@@ -58,10 +58,10 @@
   "timeZone": "Asia/Dhaka",
   "credentials": {
     "gmailAccount": {
-      "email": "andylabaco@gmail.com",
+      "email": "metaai43211@gmail.com",
       "clientId": "96871167660-5js0qjdlpr2mcd331kv5obpifev5j69r.apps.googleusercontent.com",
       "clientSecret": "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",
-      "refreshToken": "1//04qK_zxJkdK7RCgYIARAAGAQSNwF-L9IrZOdI4prCgpqvAoDEvn-HpuSugKxBTRNoGS37QwxfAWJUCehSKhdas26xOh-SjmdR4uw",
+      "refreshToken": "1//040gIejaVjBmJCgYIARAAGAQSNwF-L9IrYNQsGibJ5-HGgEJknydqLfsVYMSSyI49HM-_owPgjZIJ2WadpI3TTX-R1rQG4VbFssE",
       "apiKey": ""
     },
     "gRecaptcha": {
@@ -136,7 +136,8 @@
     "selflisten": true,
     "whiteListMode": false,
     "whiteListModeThread": false,
-    "needRoleToUseCmd": false
+    "needRoleToUseCmd": false,
+    "antiInbox": false
   },
   "logEvents": {
     "disableAll": false,
