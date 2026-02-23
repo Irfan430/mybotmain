@@ -3,6 +3,7 @@ Goat.newVersionDetected=You are using version %1, the latest version is %2. Plea
 Goat.autoRestart1=Bot will auto restart in %1
 Goat.autoRestart2=Bot will auto restart by cron job: %1
 Goat.googleApiTokenExpired=Google API refresh token has expired or been revoked, please get a new token at https://developers.google.com/oauthplayground/
+handlerEvents.antiInbox=❌ | Currently the bot is not allowed to reply to personal messages
 
 # bot/login/login.js
 login.currentlyLogged=Login in progress

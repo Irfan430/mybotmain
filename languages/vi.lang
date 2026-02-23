@@ -3,6 +3,7 @@ Goat.newVersionDetected=Bạn đang dùng phiên bản %1, phiên bản mới nh
 Goat.autoRestart1=Bot sẽ tự động khởi động lại sau %1
 Goat.autoRestart2=Bot sẽ tự động khởi động lại theo cron job: %1
 Goat.googleApiTokenExpired=refresh token google api đã hết hạn hoặc bị thu hồi, vui lòng lấy lại token mới tại https://developers.google.com/oauthplayground/
+handlerEvents.antiInbox=❌ | Hiện tại bot không được phép trả lời tin nhắn cá nhân
 
 # bot/login/login.js
 login.currentlyLogged=Đang tiến hành đăng nhập

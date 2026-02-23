@@ -58,15 +58,15 @@
   "timeZone": "Asia/Dhaka",
   "credentials": {
     "gmailAccount": {
-      "email": "andylabaco@gmail.com",
-      "clientId": "96871167660-5js0qjdlpr2mcd331kv5obpifev5j69r.apps.googleusercontent.com",
-      "clientSecret": "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",
-      "refreshToken": "1//04qK_zxJkdK7RCgYIARAAGAQSNwF-L9IrZOdI4prCgpqvAoDEvn-HpuSugKxBTRNoGS37QwxfAWJUCehSKhdas26xOh-SjmdR4uw",
+      "email": "",
+      "clientId": "",
+      "clientSecret": "",
+      "refreshToken": "",
       "apiKey": ""
     },
     "gRecaptcha": {
-      "siteKey": "6Ldu4R0qAAAAAJrUKnTYx1AaUtVIUCtye1UE_ohw",
-      "secretKey": "6Ldu4R0qAAAAAFauKulV8aV2Z8uowe1ujXG3K5iR"
+      "siteKey": "",
+      "secretKey": ""
     }
   },
   "dashBoard": {
@@ -136,7 +136,8 @@
     "selflisten": true,
     "whiteListMode": false,
     "whiteListModeThread": false,
-    "needRoleToUseCmd": false
+    "needRoleToUseCmd": false,
+    "antiInbox": false
   },
   "logEvents": {
     "disableAll": false,

@@ -23,9 +23,11 @@ function getText(type, reason, time, targetID, lang) {
 		return utils.getText({ lang, head: "handlerEvents" }, "threadBanned", reason, time, targetID);
 	else if (type == "onlyAdminBox")
 		return utils.getText({ lang, head: "handlerEvents" }, "onlyAdminBox");
-	else if (type == "onlyAdminBot")
-		return utils.getText({ lang, head: "handlerEvents" }, "onlyAdminBot");
-}
+		else if (type == "onlyAdminBot")
+			return utils.getText({ lang, head: "handlerEvents" }, "onlyAdminBot");
+		else if (type == "antiInbox")
+			return utils.getText({ lang, head: "handlerEvents" }, "antiInbox");
+	}
 
 function replaceShortcutInLang(text, prefix, commandName) {
 	return text
@@ -82,16 +84,23 @@ function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, 
 		return true;
 	}
 
-	// check if only admin bot
-	if (
-		config.adminOnly.enable == true
-		&& !adminBot.includes(senderID)
-		&& !config.adminOnly.ignoreCommand.includes(commandName)
-	) {
-		if (hideNotiMessage.adminOnly == false)
-			message.reply(getText("onlyAdminBot", null, null, null, lang));
-		return true;
-	}
+		// check if only admin bot
+		if (
+			config.adminOnly.enable == true
+			&& !adminBot.includes(senderID)
+			&& !config.adminOnly.ignoreCommand.includes(commandName)
+		) {
+			if (hideNotiMessage.adminOnly == false)
+				message.reply(getText("onlyAdminBot", null, null, null, lang));
+			return true;
+		}
+
+		// check if anti inbox
+		if (isGroup == false && config.antiInbox == true && !adminBot.includes(senderID)) {
+			if (hideNotiMessage.antiInbox == false)
+				message.reply(global.utils.getText({ lang, head: "handlerEvents" }, "antiInbox"));
+			return true;
+		}
 
 	// ==========    Check Thread    ========== //
 	if (isGroup == true) {
